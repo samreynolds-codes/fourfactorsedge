@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Four Factors Table</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            padding: 5px;
+            text-align: center;
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+<h2>Four Factors Calculator</h2>
+
+<label for="teamA-select">Team A:</label>
+<select id="teamA-select">
+</select>
+
+<label for="teamB-select">Team B:</label>
+<select id="teamB-select">
+</select>
+
+<button id="calculate-btn">Calculate Edges</button>
+<p id="result"></p>
+
+<table bgcolor="black" width="1400">
+    <tr bgcolor="gray">
+        <th width="100">Team</th>
+        <th width="100">eFG%</th>
+        <th width="100">eFG%D</th>
+        <th width="100">TOV%</th>
+        <th width="100">TOV%D</th>
+        <th width="100">ORB%</th>
+        <th width="100">DRB%</th>
+        <th width="100">FTr</th>
+        <th width="100">FTrD</th>
+        <th width="100">Shooting Edge</th>
+        <th width="100">Turnover Edge</th>
+        <th width="100">Rebounding Edge</th>
+        <th width="100">Free Throw Edge</th>
+        <th width="100">Total Edge</th>
+    </tr>
+    <tr bgcolor="lightgray" align="center" id="row-teamA">
+        <td id="teamA-name">Duke</td>
+        <td id="teamA-efg">56.8</td>
+        <td id="teamA-efgd">46.2</td>
+        <td id="teamA-tov">15.7</td>
+        <td id="teamA-tovd">18.1</td>
+        <td id="teamA-orb">38.1</td>
+        <td id="teamA-drb">24.8</td>
+        <td id="teamA-ftr">37.8</td>
+        <td id="teamA-ftrd">23.7</td>
+        <td id="teamA-shooting-edge"></td>
+        <td id="teamA-turnover-edge"></td>
+        <td id="teamA-rebounding-edge"></td>
+        <td id="teamA-free-throw-edge"></td>
+        <td id="teamA-total-edge"></td>
+    </tr>
+    <tr bgcolor="white" align="center" id="row-teamB">
+        <td id="teamB-name">Connecticut</td>
+        <td id="teamB-efg">55.3</td>
+        <td id="teamB-efgd">45.7</td>
+        <td id="teamB-tov">16.8</td>
+        <td id="teamB-tovd">18.0</td>
+        <td id="teamB-orb">35.7</td>
+        <td id="teamB-drb">28.7</td>
+        <td id="teamB-ftr">30.0</td>
+        <td id="teamB-ftrd">40.2</td>
+        <td id="teamB-shooting-edge"></td>
+        <td id="teamB-turnover-edge"></td>
+        <td id="teamB-rebounding-edge"></td>
+        <td id="teamB-free-throw-edge"></td>
+        <td id="teamB-total-edge"></td>
+    </tr>
+</table>
+
+<script>
+// ---------- CSV Parsing ----------
+function parseCSV(text) {
+    const rows = text.split("\n").filter(r => r.trim() !== "");
+    const headers = rows[0].split(",").map(h => h.trim());
+
+    return rows.slice(1).map(row => {
+        const values = row.split(",");
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = values[i] ? values[i].trim() : "");
+        return obj;
+    });
+}
+
+// ---------- Build Database ----------
+function buildDatabase(rows) {
+    const db = {};
+    rows.forEach(row => {
+        const team = row["Team"]; // matches server CSV header
+        if (!team) return;
+
+        db[team] = {
+            efg: parseFloat(row["eFG%"]) || 0,
+            efgd: parseFloat(row["eFG% Def"]) || 0,
+            tov: parseFloat(row["TO%"]) || 0,
+            tovd: parseFloat(row["TO% Def."]) || 0,
+            orb: parseFloat(row["OR%"]) || 0,
+            drb: parseFloat(row["DR%"]) || 0,
+            ftr: parseFloat(row["FTR"]) || 0,
+            ftrd: parseFloat(row["FTR Def"]) || 0,
+        };
+    });
+    return db;
+}
+
+// ---------- Edge Calculations ----------
+function calcShootingEdge(teamA, teamB) { return (teamA.efg + teamA.efgd) - (teamB.efg + teamB.efgd); }
+function calcTurnoverEdge(teamA, teamB) { return (teamB.tov - teamA.tovd) - (teamA.tov - teamB.tovd); }
+function calcReboundingEdge(teamA, teamB) { return (teamA.orb - teamB.drb) - (teamB.orb - teamA.drb); }
+function calcFreeThrowEdge(teamA, teamB) { return (teamA.ftr - teamB.ftrd) - (teamB.ftr - teamA.ftrd); }
+function calcTotalEdge(edges) { return 0.4 * edges.shooting + 0.25 * edges.turnovers + 0.2 * edges.rebounding + 0.15 * edges.freeThrow; }
+
+// ---------- UI Helpers ----------
+function setTeamStats(prefix, teamName, team) {
+    document.getElementById(prefix + "-name").innerText = teamName;
+    document.getElementById(prefix + "-efg").innerText = team.efg;
+    document.getElementById(prefix + "-efgd").innerText = team.efgd;
+    document.getElementById(prefix + "-tov").innerText = team.tov;
+    document.getElementById(prefix + "-tovd").innerText = team.tovd;
+    document.getElementById(prefix + "-orb").innerText = team.orb;
+    document.getElementById(prefix + "-drb").innerText = team.drb;
+    document.getElementById(prefix + "-ftr").innerText = team.ftr;
+    document.getElementById(prefix + "-ftrd").innerText = team.ftrd;
+}
+
+function setEdge(idA, idB, value) {
+    const elA = document.getElementById(idA);
+    const elB = document.getElementById(idB);
+
+    elA.innerText = value.toFixed(2);
+    elB.innerText = (-value).toFixed(2);
+
+    elA.style.color = value > 0 ? "green" : value < 0 ? "red" : "black";
+    elB.style.color = value < 0 ? "green" : value > 0 ? "red" : "black";
+}
+
+// ---------- Main Calculation ----------
+function calculateEdges() {
+    const teamAName = document.getElementById("teamA-select").value;
+    const teamBName = document.getElementById("teamB-select").value;
+
+    const db = window.fakeDatabase;
+    if (!db) {
+        alert("Data not loaded yet");
+        return;
+    }
+
+    const teamA = db[teamAName];
+    const teamB = db[teamBName];
+
+    if (!teamA || !teamB) {
+        alert("Missing team data");
+        return;
+    }
+    if (teamAName === teamBName) {
+        alert("Select two different teams");
+        return;
+    }
+
+    setTeamStats("teamA", teamAName, teamA);
+    setTeamStats("teamB", teamBName, teamB);
+
+    const edges = {
+        shooting: calcShootingEdge(teamA, teamB),
+        turnovers: calcTurnoverEdge(teamA, teamB),
+        rebounding: calcReboundingEdge(teamA, teamB),
+        freeThrow: calcFreeThrowEdge(teamA, teamB)
+    };
+
+    const totalEdge = calcTotalEdge(edges);
+
+    setEdge("teamA-shooting-edge", "teamB-shooting-edge", edges.shooting);
+    setEdge("teamA-turnover-edge", "teamB-turnover-edge", edges.turnovers);
+    setEdge("teamA-rebounding-edge", "teamB-rebounding-edge", edges.rebounding);
+    setEdge("teamA-free-throw-edge", "teamB-free-throw-edge", edges.freeThrow);
+    setEdge("teamA-total-edge", "teamB-total-edge", totalEdge);
+
+    const winner = totalEdge > 0 ? teamAName : totalEdge < 0 ? teamBName : "Tie";
+    document.getElementById("result").innerText =
+        winner === "Tie" ? "Matchup is even" : winner + " has the edge";
+}
+
+// ---------- Embedded CSV Data ----------
+const embeddedCSV = `
+Team,eFG%,eFG% Def,TO%,TO% Def.,OR%,DR%,FTR,FTR Def
+Abilene Christian,47.5,56.5,20.8,23.4,31,29.1,41.7,53.5
+Air Force,48.9,56.4,21.9,15.1,21.4,31.3,35.1,36.6
+Akron,58.2,51.2,15.5,18.3,33.4,29.9,29.2,30.4
+Alabama,55.2,49.2,13.1,12.8,32.4,32.8,36,32
+Alabama A&M,49.2,52.1,16.5,16.6,27.5,29.5,45.4,38.6
+Alabama St.,47.1,52.2,18.3,18.7,31.9,31.5,34.9,42.3
+Albany,51.3,53.2,18.5,15.8,32.7,32.4,24.9,35.7
+Alcorn St.,47.7,55,19.6,18.1,26.9,35.5,31.8,39.4
+American,51.5,54.4,15.6,19.2,26.9,29.4,28.7,42.1
+Appalachian St.,49.9,47.5,15.3,14,32,29,39.1,31.2
+Arizona,55.1,45,15,16.3,38.4,26.8,44.3,27.2
+Arizona St.,51.1,52.4,17.1,18.5,29.8,34.9,39.5,34.3
+Arkansas,56.4,51.8,12.2,15.6,32,30.9,35.9,31.2
+Arkansas Pine Bluff,50,52.6,18.7,16.5,27.9,34.2,38.4,43.6
+Arkansas St.,51.7,50.3,19.8,14.9,38.2,27,39.1,37
+Army,49.3,55.1,17.2,15.4,29.6,27.7,26.8,39.6
+Auburn,53,53.8,14.5,16.3,37.2,31.1,43.3,33.9
+Austin Peay,53,52.2,15.4,17.9,29.7,28.9,37.6,32.8
+Ball St.,47,52.7,16.2,18.7,27.1,31,31.6,32.1
+Baylor,53.7,52.3,16.2,16,37,31.7,34.2,30.2
+Bellarmine,59.4,59.4,15.5,15,22.4,34.2,35,34.3
+Belmont,61,49.9,18.1,17.4,28.8,29.2,32.5,30.7
+Bethune Cookman,51,49.7,19.2,15.8,30.1,31.7,40.9,38.6
+Binghamton,50,54.3,18.8,13.3,20.9,29.4,41.5,34.6
+Boise St.,52.2,52.7,16.9,14.5,33.2,23.6,42.7,32.1
+Boston College,47,48.9,15.4,14.9,28.3,28.6,32.4,34.6
+Boston University,57.5,53.6,17.8,13,28,28,31.4,30.5
+Bowling Green,51.8,51,16.5,18.4,28.7,26.9,37,37.2
+Bradley,51.1,52.8,13.9,19,27.4,27.8,35.9,38.2
+Brown,48.6,51.3,19.5,18.7,29,30,28.1,37.6
+Bryant,46.9,52.7,20.2,14.6,27.7,31,29.4,33.5
+Bucknell,48.5,54.7,19,17.9,27,31.3,29.8,35.3
+Buffalo,55.4,55.1,16.2,17.9,27.1,31.1,39.6,31.4
+Butler,50.9,51.9,15.9,15.1,34.6,30,42.1,24.9
+BYU,54.4,51.2,15.2,16.4,34.3,29.6,34.4,28.9
+Cal Baptist,48.3,46.3,17.9,17,37.5,27.2,35.9,36.6
+Cal Poly,51.5,53.8,19.9,16.2,30,29.6,34.9,34.1
+Cal St. Bakersfield,45.7,54,18.9,17.9,30.4,35.6,42.2,42.6
+Cal St. Fullerton,51.4,54.3,15.2,19.5,24.6,28.3,37.8,35.3
+Cal St. Northridge,51.3,51.6,17.5,16.4,31.9,26.6,34.2,34.3
+California,52.7,49.8,15.1,16.1,26,30.5,36.2,36.3
+Campbell,50.1,53.9,17.6,17,33.5,32,43.5,37
+Canisius,46.3,52.2,19.6,16,29.3,29.8,31.4,35.2
+Central Arkansas,54,54.9,15.4,19,28.8,27.4,31.2,30.1
+Central Connecticut,51.6,50.2,16.2,14,27.5,30.4,31.2,26.9
+Central Michigan,51.8,54,18.1,17,29.2,34.3,31.4,39
+Charleston,50.5,49.2,15.7,14.7,29.9,32.3,41.2,26.1
+Charleston Southern,54.1,46.9,18.5,12.8,29.4,30.3,30.5,43.3
+Charlotte,53.4,50.9,18.1,13.6,33.9,32.5,36.4,36.2
+Chattanooga,54.2,51.7,14.4,13.2,21.8,31.7,29.7,42.6
+Chicago St.,45.3,56.7,15.6,20.1,28.3,35,30,38
+Cincinnati,50.5,47.3,17,18.2,30.6,27.3,29.4,30
+Clemson,52.6,48.8,14,17.4,28.1,26.3,36.7,33.9
+Cleveland St.,54.2,57.2,17.8,15.1,27,36.6,37.9,35.5
+Coastal Carolina,47.9,46.8,15.2,12.3,26.9,27.6,32.3,34.9
+Colgate,53.3,52.2,14.6,15.3,26.6,29.3,29.7,33.8
+Colorado,52.9,52.6,14.6,15.3,29,29.6,36.7,36.6
+Colorado St.,57.5,52.9,18.5,15.5,30,29.3,39.4,34.2
+Columbia,53.5,51.2,19.3,15,36.1,27.2,28.6,33.5
+Connecticut,55,46,16.7,18,35.8,28.6,30.1,40.5
+Coppin St.,45.9,55.4,22.3,17.5,30.4,34.8,38.5,42.9
+Cornell,58.5,55.9,16,15.1,30.2,30.6,30.2,37.2
+Creighton,53.1,50.7,16.5,13.9,27.4,29.6,27.9,25
+Dartmouth,51.8,52.7,17.6,13.8,23.7,29.7,38,30.7
+Davidson,52.6,50.6,15.8,17.5,28.1,30,31,37.1
+Dayton,51.6,51,16.9,21,26.9,28.8,46.2,35.5
+Delaware,53.3,51.5,18.2,14,20.8,31.1,30.6,30.2
+Delaware St.,42.9,52.9,19.9,19.5,27.7,32,34.1,40.5
+Denver,53.6,56,14.3,13,29.8,32.8,34.1,36.8
+DePaul,49.8,49.3,17.8,18.6,30,31.1,35.3,37.8
+Detroit Mercy,49.5,52.2,16,14.4,33.3,30.8,32.6,37.6
+Drake,51.4,52.6,15,14.6,26.6,29.9,33.5,32
+Drexel,50.7,47.1,19,16.4,31.2,31,31.6,35.4
+Duke,56.6,46.2,15.9,17.3,38.4,25.2,38.2,22.8
+Duquesne,52.3,52.5,17.6,18.3,30.4,29.6,38.3,39.9
+East Carolina,46.4,52.3,17.1,16.2,33.4,32.5,39.2,32.2
+East Tennessee St.,55.3,51,15.2,18.5,28.3,27.9,35,36.4
+East Texas A&M,49.2,52.9,19.2,17,25.7,32.8,32,34.5
+Eastern Illinois,45.7,50.8,18.6,19.3,28.2,35.2,33.5,35.3
+Eastern Kentucky,52.1,56.1,16.9,14.8,32.5,31.7,30.7,38.5
+Eastern Michigan,49.6,50.3,17.4,15.6,27.8,29.1,29.3,35.5
+Eastern Washington,53.7,54.9,17.7,16.2,31.3,30.8,36.1,37.3
+Elon,52.2,54,15.9,16.4,32.2,33.5,33.5,34.6
+Evansville,49.3,55.1,19.1,15.4,22,30.2,29.8,31.4
+Fairfield,48.8,51,15.3,16.8,35.8,29.1,27.7,30.4
+Fairleigh Dickinson,47.1,55.2,18.1,16.1,32,27.3,32.8,36.3
+FIU,50.6,52.9,17.7,20.1,33.9,34.8,38.6,35.9
+Florida,54.1,46.1,16.3,15.3,43.3,24.8,39,34
+Florida A&M,49.2,51.2,21.5,19.1,30.9,30.9,37.4,39.6
+Florida Atlantic,52.2,49.5,17.6,15.5,31.6,28.3,33.3,36.2
+Florida Gulf Coast,52,53.4,15.9,16.5,31.1,28.2,29.1,38.3
+Florida St.,52.3,52.2,15.2,19,30.8,34.1,34.7,32.7
+Fordham,48.6,49.9,17.2,17.2,34.1,26.8,26.4,30.3
+Fresno St.,50.6,51.5,18.1,18.2,27.9,30.6,33.8,28.6
+Furman,54.8,50.2,17.8,13.7,30.5,28.2,32.7,28.9
+Gardner Webb,47.8,56.9,19.8,15.3,23.2,36.6,30.3,35.2
+George Mason,52.7,49.5,15.8,15.4,31.3,28.3,41.1,28.9
+George Washington,54.4,52.4,18.2,17.7,35.8,28.7,34.9,34.9
+Georgetown,49.6,49.9,15.8,16.2,32.5,31.5,37.3,33.9
+Georgia,54.2,50.6,14.3,18.4,34.9,34.9,36.9,30.2
+Georgia Southern,51.4,52.3,14.6,18.7,28.8,35.2,39.6,41.4
+Georgia St.,44.2,50.6,15.9,16.4,27.7,33.6,37.2,34.9
+Georgia Tech,50,49.9,18.6,15.6,29.9,30.7,33.3,34.2
+Gonzaga,55.6,46.3,13.6,20,34.8,25.7,31,30.9
+Grambling St.,48.8,50,21.2,20.8,30.3,32.5,41.1,40
+Grand Canyon,51.7,47.4,17.6,17.3,31.3,25.3,39.5,39
+Green Bay,54.9,53.6,16,13.2,25.1,29.6,41.6,37.4
+Hampton,45.7,52,17,17.2,32.9,30,39.2,46.5
+Harvard,53.2,50.4,17.4,17.1,26.8,28.2,25.7,26.6
+Hawaii,52,46.8,18.8,16.8,31.3,25.3,41.4,35.6
+High Point,54.5,50.5,12.8,21.3,31.8,31.1,40.8,35.5
+Hofstra,51.4,46.3,16.1,14.9,34.7,31,31.6,35.1
+Holy Cross,49.8,54.8,15.3,14.1,21.9,27,31.5,27.6
+Houston,51.9,46.2,12.8,20.6,35.7,30.3,26.3,38.7
+Houston Christian,49.7,54.2,18.9,17.6,29.9,32.5,36,30.7
+Howard,50.9,48.7,19.3,20.7,35.8,31.4,43.4,38.4
+Idaho,51.4,50.5,15,15.1,28.4,24.2,34.6,38.5
+Idaho St.,51.8,54.5,17,14.7,32.8,27.9,37.9,38
+Illinois,55.1,47.4,13.1,11.8,39.4,26.8,33,19.4
+Illinois Chicago,49.8,50.5,17.6,19.7,36.3,32,36.2,33.9
+Illinois St.,53.6,49.8,16.9,16,28,25.4,31.6,32.3
+Incarnate Word,50.2,54.5,17.2,15.7,32.1,32,34,41.6
+Indiana,56.1,49,15.1,15.1,26.9,29.3,35,37
+Indiana St.,52.8,50.2,19.5,14.9,26.2,31.8,27.4,28.8
+Iona,51.9,48.9,17.2,16.6,27.8,31.2,29.3,28.8
+Iowa,56.4,52.6,15.1,20.3,30.2,29.2,35.1,38.5
+Iowa St.,56.2,49.8,14.9,22.6,35.2,28.6,34.5,28.1
+IU Indy,52.2,58.2,15.9,19.2,28.7,35.6,21.7,46.6
+Jackson St.,45.7,53,19.4,16.5,29.7,37.2,37.4,41.9
+Jacksonville,50,54.8,17.2,15,31.7,29.1,32.8,42.7
+Jacksonville St.,49.7,49.6,17,16.2,29.8,28,43.1,38.7
+James Madison,53.1,49,17.3,12.8,30.6,29.5,35.9,40.8
+Kansas,51.2,45,15.6,13.8,29.2,29.9,32.2,27.4
+Kansas St.,53.3,52.5,17.4,17.1,29.2,33.9,26.9,35.2
+Kennesaw St.,50.4,48.3,16.7,16,35.2,31.6,45.1,47.1
+Kent St.,51.4,52.1,18,16.1,35.3,29.3,43.5,39.5
+Kentucky,53.3,48.9,15.4,15.5,33.2,30,37.4,36.4
+La Salle,45.4,55,18.2,17.1,33.7,32.4,37.5,31.5
+Lafayette,49.3,53.6,15.3,15.1,25.8,28.6,32.4,30.6
+Lamar,47.8,50.9,18.1,17.3,35.7,29.4,27.9,44.4
+Le Moyne,52.7,49.3,19.1,15,25.2,29.1,39.5,32.7
+Lehigh,52.9,50.6,17.7,16.2,23.2,31.4,31.8,32.5
+Liberty,59.1,52.7,13.4,17.1,19.3,33.1,31.4,27
+Lindenwood,48,49.1,18.7,18.4,33.2,31.8,38.6,37.4
+Lipscomb,54.1,53.2,16,17.7,25.8,30.2,26,29
+Little Rock,49.4,51.8,18.4,18.5,31.5,36.6,27.7,33.1
+LIU,52.8,50,18.9,18.8,33.9,33,34,34.7
+Long Beach St.,50.6,53.7,18,17.5,26.2,27.8,30.7,42.3
+Longwood,49.7,53.8,19.1,19.8,34.6,27.7,41.3,42.1
+Louisiana,47.1,52.6,16.8,18.3,28.3,32.3,28.7,45.8
+Louisiana Monroe,47.8,57.1,16.9,15.7,25.1,35.4,38.8,27.7
+Louisiana Tech,47.4,48.7,18.3,17.8,36.4,31.6,33.1,36.3
+Louisville,56.5,48.7,16.8,16.7,32.8,27.5,33.1,33
+Loyola Chicago,49.8,52,19.8,12.9,30.5,29.7,34.8,33.6
+Loyola Marymount,51.8,48.9,17.5,16.6,26.7,32,31.1,32.5
+Loyola MD,50.4,54.7,15.5,15.3,27.6,29,29.9,32.7
+LSU,52.8,50.9,15.6,13.9,33.1,31.7,40.9,37.8
+Maine,49.6,50.6,19.1,19.4,19.7,34.3,38.4,33.9
+Manhattan,47.9,53.9,15.6,16.7,28.6,37,34,25.7
+Marist,49.3,45.6,16.9,19.5,29.1,28.3,25.7,37.6
+Marquette,50.5,50.6,16,19.3,29.7,34.7,32.8,32
+Marshall,54.8,50.3,16.6,16.3,31.9,33.8,29.2,41.1
+Maryland,48.1,54.4,18.6,14.9,33.8,29.1,36.4,35.8
+Maryland Eastern Shore,47.8,50.7,23.8,17.9,32.4,33.6,29.5,43
+Massachusetts,53.1,52.9,17.8,16.8,33.3,26.1,37,44.6
+McNeese St.,50.7,49.3,14.2,24.5,35.1,34.9,37.4,42.1
+Memphis,48.7,48.7,18.9,18.5,35.3,35.6,34.7,42.4
+Mercer,53.1,52.5,15,17,32.6,33.2,39.2,29.7
+Mercyhurst,49.5,50.1,14.3,18.7,26.4,29.9,25.6,42.6
+Merrimack,49.1,46.7,14.8,20.4,24.8,39.9,38.2,37.1
+Miami FL,55.3,51.7,16.2,18.2,37.2,25.9,37.1,29.5
+Miami OH,58.6,51.2,14.3,17.4,25.5,28.7,39.6,30.2
+Michigan,58.8,44.9,16.3,15,34.9,27.3,38.1,25.9
+Michigan St.,53.8,48.9,17.2,14.9,37.8,22.4,35.9,30.2
+Middle Tennessee,51.6,51,17.1,15,30.7,28.5,32.7,35.7
+Milwaukee,49.9,55.5,15.2,15.8,33,29.2,32.1,35.9
+Minnesota,53.9,51.9,16.5,16.9,26.8,29.5,35.8,26.9
+Mississippi,50.4,50.5,14,16.4,28.3,32.6,33,41.2
+Mississippi St.,51.5,50.9,16.1,12.8,29.8,30.7,30.7,32.3
+Mississippi Valley St.,45.2,55.5,21.9,17.1,26.4,35.5,33.9,50.8
+Missouri,55,51.5,17.8,16.5,34.9,31.7,42.1,35.5
+Missouri St.,51.1,52,16.7,16.9,32,32.1,43.8,40.2
+Monmouth,49.6,50.1,16.6,19.9,31.2,32.8,32.7,32.2
+Montana,55.8,50.5,19.6,14.3,20.7,29.6,36.8,32.6
+Montana St.,53.6,51.7,14.7,15.7,27,28.2,30.2,29.6
+Morehead St.,49.2,50.2,18,15.4,35.8,35.8,37.7,35.6
+Morgan St.,45.8,51.7,17.8,16.5,30.7,35.2,42.7,50.9
+Mount St. Mary's,50.6,47.2,22.4,15.3,32.3,29.1,33.3,37.3
+Murray St.,53.8,52.4,16.3,15.8,32.6,31.3,38.6,32.2
+N.C. State,55,52.7,13.1,18.2,28.2,30.5,35.1,36.9
+Navy,53.1,48.3,16.8,18.3,31.9,27.4,38.8,26
+Nebraska,55.5,48.1,14.4,18.9,26.7,27.4,26.2,25.1
+Nebraska Omaha,52.2,52.7,16.1,14.1,25.5,28.7,34.5,33.6
+Nevada,50,51.1,14.8,17,32.2,26.9,44.8,38.9
+New Hampshire,46.7,53.4,16.5,15.8,25.7,26.9,28.5,35.8
+New Haven,48.7,51.8,17.8,17.1,21.5,26.8,31.7,27.7
+New Mexico,53.5,49.5,14.9,19,30.6,27.7,35.8,33.3
+New Mexico St.,48.5,48.7,15,14.7,32.5,30.3,34.9,44.2
+New Orleans,49.6,49,20.5,14.9,35.6,34.5,46.4,39.5
+Niagara,50.5,52.8,18.9,16.6,24.8,32.9,26.6,33.8
+Nicholls St.,50.6,54.4,17.4,20.5,28.1,33.7,34.5,37.9
+NJIT,46.7,50,17.1,16.2,26.2,32.1,33.2,37.9
+Norfolk St.,49.3,51.7,18.7,18.8,32.5,32.3,43.5,45.3
+North Alabama,48,55.2,17.5,14.5,31.2,32.2,37.6,30.3
+North Carolina,54.3,48.3,13.9,13.6,31.2,27.8,37.1,23.8
+North Carolina A&T,50.7,52.9,18.6,14.1,31.7,28.6,42.3,37.5
+North Carolina Central,47.5,54.5,18.1,19.9,30,39.4,39.3,36.9
+North Dakota,49.4,56.5,14.1,19.4,27.4,32.4,37.8,43.8
+North Dakota St.,53.2,52,15.6,18.7,32.9,25.5,30.6,29.2
+North Florida,52.9,56.3,17.9,12.7,25.2,37.6,28.8,31.4
+North Texas,46,48.4,16.7,21.3,33.5,32.4,39.6,45.1
+Northeastern,52.4,56.4,16.4,16.8,27.3,30.2,29.4,41.9
+Northern Arizona,51.7,56.9,16,16.6,23.3,33.4,31.8,32.7
+Northern Colorado,55.7,50.1,15.4,12.4,27.2,24.2,27.5,38.8
+Northern Illinois,47.6,55.6,21.8,16.3,30.3,30,38.3,38.3
+Northern Iowa,53.8,47.5,14.4,18,21.8,26.5,25.6,29.6
+Northern Kentucky,53.2,54.2,16.3,18.6,32.2,31.6,35.9,37.2
+Northwestern,51.7,51,13,17.5,28.1,34.7,33.9,34.8
+Northwestern St.,48.6,53,18.3,16.9,26.1,32.6,40.1,36.3
+Notre Dame,52.3,51.8,17,14,31.2,26.7,34.1,36.2
+Oakland,52.7,54.7,14.7,15.1,31.3,34.4,38.1,24.6
+Ohio,50.9,53,15.5,16.1,28.4,32.8,36.9,38.2
+Ohio St.,56.2,50.2,15.3,15.6,30.4,30,37.2,34.7
+Oklahoma,54.7,51,14.3,15.4,33.3,32.9,36.2,34.9
+Oklahoma St.,52,53.1,15.8,15.6,30.8,30.4,39.4,31.5
+Old Dominion,50.7,50.8,15.4,14.5,26,30.3,34.7,42
+Oral Roberts,49.7,53.6,18.5,14.7,28.4,31.8,34.8,39.1
+Oregon,49.5,50.9,17.6,15.7,32.3,32.3,35,32
+Oregon St.,50.5,50.3,17.7,15.3,26.8,32.1,43.1,35.1
+Pacific,52.2,50,20.1,15.1,35.3,25,30.5,36.3
+Penn,50.4,52.1,15.3,17.3,30,31.3,33.9,27.5
+Penn St.,53,58.4,15.6,17.7,25.9,31.1,33.8,27.5
+Pepperdine,47.6,54.2,18.3,16.5,29.1,34,33.8,28.5
+Pittsburgh,51,53.4,17.3,16.2,33.9,28.1,30.4,30.9
+Portland,51.2,52.7,19.7,17,28.1,32.5,34.4,32.6
+Portland St.,50.6,48.8,16.9,18,30,26.4,37.1,42.8
+Prairie View A&M,47.4,50.9,15.8,19,26.7,35.4,41.6,42.6
+Presbyterian,51,51.2,19.3,15.7,33.1,30.6,39.3,37.1
+Princeton,49.6,52,17.1,14.3,27.2,28.5,34.6,34
+Providence,55,51.4,16.7,13.1,31.7,30.8,36.7,32.7
+Purdue,57.6,52.4,13.7,15.3,36.4,27.1,28.6,25.5
+Purdue Fort Wayne,52.6,56.1,14.5,19.1,22.9,34.5,30.6,28.5
+Queens,56.4,54.6,14.8,15.1,30.2,33.6,35.4,38.1
+Quinnipiac,48.2,48.9,15.9,17.4,34.1,32,33.8,30.6
+Radford,51.3,53,17.1,18.5,29.8,32.2,42.4,40
+Rhode Island,50.1,50.4,19.2,21.1,31,31.8,38.4,42.6
+Rice,48.5,51,17.9,15.7,35.3,34.6,33.9,40.4
+Richmond,52.7,52,14.3,17.7,25,31,36.9,35.1
+Rider,42.8,55.2,16.9,15.3,32.6,32.8,30.1,32.5
+Robert Morris,54.9,50,18.6,15.9,37.5,28.8,28,40.1
+Rutgers,47.2,53,15,17.1,29.7,32.8,36.3,31.7
+Sacramento St.,47,55,14.1,17.1,25.2,33.4,41.2,36.2
+Sacred Heart,52,53.5,17.7,14.5,28.6,30.9,31,27
+Saint Francis,48.9,58.9,18.4,18.4,27.5,33.1,30.8,38.3
+Saint Joseph's,49.2,47.7,16.8,15,31.4,30.6,29.7,26.9
+Saint Louis,59.7,45.2,17.2,15.9,30.7,27.2,33.7,37.1
+Saint Mary's,52.8,46.8,16.8,15.2,37.5,23.9,35.5,25.7
+Saint Peter's,46.4,48.1,17.7,20,37,34.7,35.5,46.4
+Sam Houston St.,52.5,51.4,16.8,16.1,35.9,30.1,34.4,36.7
+Samford,53.1,51.9,13.4,13,25.3,25.7,41.9,32.9
+San Diego,51.2,54.7,17.5,18.9,28.1,34.5,25.8,38.8
+San Diego St.,52.7,48.2,17.2,20.3,29.5,31.1,39,38.5
+San Francisco,51.2,50.8,15.8,14.1,31.3,29,40.1,29.6
+San Jose St.,49.7,57.1,15.1,17.4,29.3,36.5,33.4,35.3
+Santa Clara,54.4,52,15.4,19.9,36.4,32.1,25.5,38.2
+Seattle,49.8,48.4,16.8,21.1,23.7,31.8,34.2,33
+Seton Hall,47.6,47.3,16.7,21.5,35.6,31.9,35.3,42.1
+Siena,50.4,48.5,15.8,17,31.8,29.5,33.4,27.5
+SIU Edwardsville,49.5,45.6,17.9,17,30.1,31.6,30.6,34.3
+SMU,55.6,51.6,15.7,16.8,35.4,31.6,30.4,32.1
+South Alabama,52.6,50.1,13,18.1,25,31.4,38.5,25.4
+South Carolina,50.3,51.6,14.5,14.6,27.2,32.1,36.7,34
+South Carolina St.,46.8,53.9,20.8,18.8,31.4,37.6,41.1,51.9
+South Dakota,49.9,54.5,16.6,15.9,28.7,30.3,45.2,31
+South Dakota St.,52,51.8,16.1,14.5,30.3,25.1,29.7,34.5
+South Florida,50.6,48.8,15.1,19.1,38.1,31.9,40.4,39.1
+Southeast Missouri St.,49.8,48.8,16.9,18.1,29.6,28.2,38.8,48
+Southeastern Louisiana,46.7,52.4,18.4,19.1,28.6,31.4,40.3,41.2
+Southern,49.1,53.2,16.5,18.6,31.4,31.3,39.8,42.9
+Southern Illinois,49.2,49,17,18.5,30.9,27.3,31.3,31.4
+Southern Indiana,43.7,49.4,17.2,16.4,31.4,33.8,37.2,36.2
+Southern Miss,49,51.4,18.4,17.8,32.5,28.8,43.2,43.6
+Southern Utah,50.7,53.2,20.3,14.8,28.8,33.6,33.1,29.8
+St. Bonaventure,52.4,53.3,16.8,17.1,34.5,29.8,30,33.9
+St. John's,51.1,47.5,14.4,19.1,35.2,29.9,40.2,31.8
+St. Thomas,58.9,50.7,14.3,17,22.6,26.6,33.8,30.7
+Stanford,51.5,51,15.5,18,32.5,29.8,35.5,40.3
+Stephen F. Austin,51.7,47.7,14.3,17.6,33.8,29.5,30.1,31.1
+Stetson,53.1,55.2,18.1,15.1,26.6,31.8,32.4,30.4
+Stonehill,46.9,47.8,19.4,13.4,27.5,27.1,27.3,30.3
+Stony Brook,50.2,50.7,16.8,17.1,28,32.4,28.4,35.4
+Syracuse,52.6,50.3,16,17.4,29.2,33.6,35.1,32.6
+Tarleton St.,48.3,53.6,20,23.4,31.5,35.1,41.9,47.7
+TCU,50.4,51.2,15.3,19.6,34,29.1,37.5,30.5
+Temple,50.2,50.7,13.7,15.5,29.8,30.3,40.6,35.5
+Tennessee,51.4,47.8,17.3,16.2,44.7,27.8,37.4,36.3
+Tennessee Martin,48.7,46.1,21.4,20,37,32,37.4,35.8
+Tennessee St.,50,51.6,16.7,19.8,34.8,30.6,33.4,41.4
+Tennessee Tech,48.9,51.5,19.1,15.1,31.3,30.7,35.5,31.3
+Texas,54.1,50.8,15,13,35.4,26.9,44.2,39.6
+Texas A&M,53.8,50.7,14.7,18.4,32,33,37.1,35.3
+Texas A&M Corpus Chris,49.5,50.1,19.4,19,31.7,28.8,41.1,46.3
+Texas Southern,49.7,52.5,18.5,16.5,28.8,31.2,38.2,44
+Texas St.,50,52,18.6,18.5,33.9,28.4,34,39.1
+Texas Tech,56.1,49.7,15.8,14.8,33.2,30.6,27.7,31.4
+The Citadel,49.5,57.5,16.3,14.7,27.9,31.5,30,33.3
+Toledo,54.5,54.3,14.7,17.9,29.5,33.7,30.5,26.6
+Towson,46.5,48.5,15.9,15.1,36,29.1,30.4,29.3
+Troy,51.5,50.2,17.3,16.7,34.6,31.7,36.2,31.4
+Tulane,49.4,50.7,15.4,17.1,22.8,35.8,43.5,38.1
+Tulsa,55.6,49.4,15.6,15.4,33,28.9,41.1,31.7
+UAB,48.4,50,12.5,16.1,32.5,27.7,36.4,28.7
+UC Davis,51.8,51.7,17.9,19.8,25.2,30.5,40.5,39.1
+UC Irvine,49.5,45.9,17.8,18.8,31,31.2,35.9,26.7
+UC Riverside,48.9,52.7,19,15.5,27.8,30,35,40.9
+UC San Diego,52.6,48.4,16.5,16.8,26.1,27,31.2,29.3
+UC Santa Barbara,54.7,52.6,18.7,16.8,31,25.5,36.8,42.4
+UCF,52.6,52.1,16,15.7,35,28.8,30.5,34.9
+UCLA,53.4,50.4,13.4,18.5,31,33.3,33.1,34.4
+UMass Lowell,49.8,53.5,18,14.2,32.7,29.4,34.9,28.3
+UMBC,54.1,49.4,14,15.1,24.9,25.8,34.1,25.7
+UMKC,45.7,56.3,18.2,16.4,26.4,35.9,29.2,31.4
+UNC Asheville,51,51.3,17.4,15.5,29.8,31.3,40,38.7
+UNC Greensboro,52,56.2,15,13.7,28.1,29,42,30.6
+UNC Wilmington,50.4,47.5,14.8,14.9,35.3,27.6,40.4,31.7
+UNLV,53.6,52.3,17.1,17.4,30.2,32,40.7,44.9
+USC,50.4,49.7,17.4,16.3,32.4,32.2,44.2,33.4
+USC Upstate,48.3,51,18.2,16.4,29.2,31.4,32.8,36
+UT Arlington,47.2,47.4,20.7,18,34.9,30.1,42.5,40.9
+UT Rio Grande Valley,54.8,47.8,18.5,16.3,28.2,32.1,28.9,38.9
+Utah,52,53.9,16.7,13.3,29.3,31.6,31.7,29.9
+Utah St.,56.2,49.7,15.1,20.3,32.7,32.8,38.8,39.2
+Utah Tech,53.3,50.9,17.6,16.9,28.1,34.5,30.6,33
+Utah Valley,54.9,49.4,20.1,21.3,34.8,31.4,38.2,39.2
+UTEP,48.3,51.5,17.4,18,26.2,32.8,33.4,42
+UTSA,44.8,53.3,17.5,14.7,30.2,38.7,29.5,33.3
+Valparaiso,47.6,50.5,15.7,16.9,32.5,30.1,39.1,35.1
+Vanderbilt,55.3,49,13.5,17.7,31.2,31.5,38.1,39.5
+VCU,53.6,49,15.1,17,31.6,30,42,32.8
+Vermont,53.1,50.4,14.3,14.8,26.2,23,31.1,36.4
+Villanova,53.8,51.4,15,18.6,32.2,31.8,30.9,30
+Virginia,54.6,45.7,16,15.4,37.9,29.2,32.3,32.9
+Virginia Tech,52.2,50.8,14.9,17.2,31.9,32.6,34,28.8
+VMI,47.6,57,15.3,15.7,25.6,37.2,30.6,34.6
+Wagner,49.6,50.4,18.5,14.9,32.8,29.6,32.3,40.8
+Wake Forest,52.7,51.8,15.5,17.7,30.1,33,35.2,35.7
+Washington,51.2,50.2,15.3,14.3,34.6,28.5,30.1,31
+Washington St.,54.7,52.6,18.4,14.6,29.5,28.2,30.2,33
+Weber St.,51.7,54.5,15.7,16.3,31.8,27.7,39.2,36.4
+West Georgia,49.6,53.4,15.9,14.7,31.5,29,29.2,36.9
+West Virginia,51,48.1,17.2,18,30.7,29.3,35.6,29.2
+Western Carolina,50.4,54.9,16.8,14.5,35.4,26.3,31.3,37.8
+Western Illinois,44.5,54.2,17.5,14.9,27,34.8,37.7,34.8
+Western Kentucky,47.5,51.2,14.5,17.2,31.8,29.5,41.2,46.8
+Western Michigan,49.9,54.4,16.9,13.4,30.5,29.1,32.8,37.5
+Wichita St.,49.4,47.2,14.9,15.7,38,28.8,36,34.3
+William & Mary,54.3,51.9,16.5,19,26,31.5,44,35.5
+Winthrop,49.7,51.4,14.7,16.7,34.1,27.7,44,39
+Wisconsin,54.5,51.4,12.8,14.3,29.1,28.2,31.5,29.8
+Wofford,52.5,53.8,13.4,14.9,29.8,29,36.2,36.8
+Wright St.,54.3,52.4,16.1,16.7,32.8,29.4,37.4,33.3
+Wyoming,51.8,52,16.3,16.8,34.1,28,35.4,47.9
+Xavier,51.8,54.1,13.9,15.5,26.5,29.5,28.1,32.6
+Yale,55.6,51.7,14,16.3,34.2,29.7,35.1,26.8
+Youngstown St.,53.7,52.3,18.8,17.8,30.4,30.7,31.4,36
+`;
+
+// ---------- Local Initialization ----------
+function localInitialize() {
+    const rows = parseCSV(embeddedCSV);
+    window.fakeDatabase = buildDatabase(rows);
+
+    const teamASelect = document.getElementById("teamA-select");
+    const teamBSelect = document.getElementById("teamB-select");
+    teamASelect.innerHTML = "";
+    teamBSelect.innerHTML = "";
+    const teamNames = Object.keys(window.fakeDatabase).sort();
+    teamNames.forEach(team => {
+        const optA = document.createElement("option");
+        optA.value = team;
+        optA.textContent = team;
+        teamASelect.appendChild(optA);
+        const optB = document.createElement("option");
+        optB.value = team;
+        optB.textContent = team;
+        teamBSelect.appendChild(optB);
+    });
+
+    if (teamNames.length > 1) {
+        teamASelect.selectedIndex = 0;
+        teamBSelect.selectedIndex = 1;
+    }
+
+    calculateEdges();
+}
+
+// ---------- Event Listeners ----------
+["teamA-select", "teamB-select"].forEach(id =>
+    document.getElementById(id).addEventListener("change", calculateEdges)
+);
+
+document.getElementById("calculate-btn").addEventListener("click", calculateEdges);
+
+window.addEventListener("DOMContentLoaded", localInitialize);
+</script>
+<footer style="text-align:center; font-size:16px; color:black; margin-top:10px; margin-bottom:5px;">
+    Data will be manually updated daily after all CBB game data is collected once games are finished
+</footer>
+<footer style="text-align:center; font-size:12px; color:gray; margin-top:20px;">
+    Stats based on Dean Oliver’s Four Factors | Data from Bart Torvik
+</footer>
+</body>
+</html>
