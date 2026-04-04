@@ -120,42 +120,42 @@ function buildDatabase(rows) {
 }
 
 // ---------- Edge Calculations ----------
-// Returns { a: Team A edge, b: Team B edge }
+// Each function returns { a: Team A edge, b: Team B edge }
 
 function calcShootingEdge(teamA, teamB) {
-    // High eFG% is good, low eFG%D is good
+    // High eFG% is good, low eFG%D (allowed) is good
     return {
-        a: (teamA.efg - teamB.efg) + (teamB.efgd - teamA.efgd),
-        b: (teamB.efg - teamA.efg) + (teamA.efgd - teamB.efgd)
+        a: teamA.efg - teamB.efgd,   // Team A offense vs Team B defense
+        b: teamB.efg - teamA.efgd    // Team B offense vs Team A defense
     };
 }
 
 function calcTurnoverEdge(teamA, teamB) {
-    // Low TOV% is good, high TOV%D is good
+    // Low TOV% is good, high TOV%D (forced turnovers) is good
     return {
-        a: (teamA.tovd - teamA.tov),
-        b: (teamB.tovd - teamB.tov)
+        a: teamA.tovd - teamA.tov,   // Net turnovers for Team A
+        b: teamB.tovd - teamB.tov    // Net turnovers for Team B
     };
 }
 
 function calcReboundingEdge(teamA, teamB) {
-    // High ORB% is good, low DRB% is good
+    // High ORB% is good, low DRB% (opponent) is good
     return {
-        a: (teamA.orb - teamB.drb),
-        b: (teamB.orb - teamA.drb)
+        a: teamA.orb - teamB.drb,    // Team A offensive boards vs Team B defensive boards
+        b: teamB.orb - teamA.drb     // Team B offensive boards vs Team A defensive boards
     };
 }
 
 function calcFreeThrowEdge(teamA, teamB) {
-    // High FTR is good, low FTRD is good
+    // High FTr is good, low FTrD is good
     return {
-        a: (teamA.ftr - teamB.ftrd),
-        b: (teamB.ftr - teamA.ftrd)
+        a: teamA.ftr - teamB.ftrd,   // Team A free throw rate vs Team B defense
+        b: teamB.ftr - teamA.ftrd    // Team B free throw rate vs Team A defense
     };
 }
 
 function calcTotalEdge(edges) {
-    // Weighted sum
+    // Weighted sum of edges based on Four Factors importance
     return {
         a: 0.4 * edges.shooting.a + 0.25 * edges.turnovers.a + 0.2 * edges.rebounding.a + 0.15 * edges.freeThrow.a,
         b: 0.4 * edges.shooting.b + 0.25 * edges.turnovers.b + 0.2 * edges.rebounding.b + 0.15 * edges.freeThrow.b
