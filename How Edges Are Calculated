@@ -1,5 +1,5 @@
-Team A Shooting Edge = (A eFG% - B eFG%D) - (B eFG% - A efg%D)
-Team B Shooting Edge = (B eFG% - A eFG%D) - (A eFG% - B efg%D)
+Team A edge = (Team A eFG% - Team B eFG%) + (Team B eFG%D - Team A eFG%D)
+Team B edge = (Team B eFG% - Team A eFG%) + (Team A eFG%D - Team B eFG%D)
 
 Team A Turnover Edge = (A TOV%D - A TOV%) - (B TOV%D - B TOV%)
 Team B Turnover Edge = (B TOV%D - B TOV%) - (A TOV%D - A TOV%)
