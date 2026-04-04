@@ -1,14 +1,14 @@
-Team A edge = (Team A eFG% - Team B eFG%) + (Team B eFG%D - Team A eFG%D)
-Team B edge = (Team B eFG% - Team A eFG%) + (Team A eFG%D - Team B eFG%D)
+Team A Shooting Edge: (teamA.efg - teamB.efg) + (teamB.efgd - teamA.efgd)
+Team B Shooting Edge: (teamB.efg - teamA.efg) + (teamA.efgd - teamB.efgd)
 
-Team A Turnover Edge = (A TOV%D - A TOV%) - (B TOV%D - B TOV%)
-Team B Turnover Edge = (B TOV%D - B TOV%) - (A TOV%D - A TOV%)
+Team A Turnover Edge: (teamB.tov - teamA.tov) + (teamA.tovd - teamB.tovd)
+Team B Turnover Edge: (teamA.tov - teamB.tov) + (teamB.tovd - teamA.tovd)
 
-Team A Rebounding Edge = (A ORB% - B DRB%) - (B ORB% - A DRB%)
-Team B Rebounding Edge = (Team B ORB% - Team A DRB%) - (A ORB% - B DRB%)
+Team A Rebounding Edge: (teamA.orb - teamB.orb) + (teamA.drb - teamB.drb)
+Team B Rebounding Edge: (teamB.orb - teamA.orb) + (teamB.drb - teamA.drb)
 
-Team A Free Throw Edge = (A FTr - A FTrD) - (B FTr - B FTrD)
-Team B Free Throw Edge = (B FTr - B FTrD) - (A FTr - A FTrD)
-
-Team A Total Edge = 0.4 * A Shooting + 0.25 * A Turnover + 0.2 * A Rebounding + 0.15 * A FT
-Team B Total Edge = 0.4 * B Shooting + 0.25 * B Turnover + 0.2 * B Rebounding + 0.15 * B FT
+Team A Free Throw Edge: (teamA.ftr - teamB.ftr) + (teamB.ftrd - teamA.ftrd)
+Team B Free Throw Edge: (teamB.ftr - teamA.ftr) + (teamA.ftrd - teamB.ftrd)
+       
+Team A Total Edge: (0.4 * edges.shooting.a + 0.25 * edges.turnovers.a + 0.2 * edges.rebounding.a + 0.15 * edges.freeThrow.a)
+Team B Total Edge: (0.4 * edges.shooting.b + 0.25 * edges.turnovers.b + 0.2 * edges.rebounding.b + 0.15 * edges.freeThrow.b)
