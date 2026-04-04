@@ -122,31 +122,44 @@ function buildDatabase(rows) {
 // ---------- Edge Calculations ----------
 // Each function returns an object: { a: valueForTeamA, b: valueForTeamB }
 function calcShootingEdge(teamA, teamB) {
-    // team advantage = (team stat vs opponent defense) - (opponent stat vs team defense)
+    // Team edge = (Team eFG% - Opponent eFG% allowed) - (Opponent eFG% - Team eFG% allowed)
+    // Higher is better: high eFG% and low eFG% allowed help.
     return {
         a: (teamA.efg - teamB.efgd) - (teamB.efg - teamA.efgd),
         b: (teamB.efg - teamA.efgd) - (teamA.efg - teamB.efgd)
     };
 }
 function calcTurnoverEdge(teamA, teamB) {
-    // Lower TO% is better; team advantage = (opponent TO% vs team defense) - (team TO% vs opponent defense)
+    // Lower TO% is better. Defensive TO% forced is good. Edge = (Opponent TO% - Team TO% allowed) - (Team TO% - Opponent TO% allowed)
+    // We want higher values to be better for the team: so, positive edge if team forces more TOs and commits fewer.
+    // Team edge = (Opponent TO% - Team TO% forced) - (Team TO% - Opponent TO% forced)
+    // But actually, to make higher better, flip signs:
+    // Team edge = (Opponent TO% forced - Team TO%) - (Team TO% forced - Opponent TO%)
+    // Or, more simply, (Team TO% forced - Team TO%) - (Opponent TO% forced - Opponent TO%)
+    // Let's use: (Team TO% forced - Team TO%) - (Opponent TO% forced - Opponent TO%)
     return {
-        a: (teamB.tov - teamA.tovd) - (teamA.tov - teamB.tovd),
-        b: (teamA.tov - teamB.tovd) - (teamB.tov - teamA.tovd)
+        a: (teamA.tovd - teamA.tov) - (teamB.tovd - teamB.tov),
+        b: (teamB.tovd - teamB.tov) - (teamA.tovd - teamA.tov)
     };
 }
 function calcReboundingEdge(teamA, teamB) {
-    // team advantage = (team OR% - opponent DR%) - (opponent OR% - team DR%)
+    // Offensive rebounding% (ORB%) higher is better; Defensive rebounding% allowed (opponent ORB% vs team DRB%) lower is better.
+    // Team edge = (Team ORB% - Opponent ORB%) + (Team DRB% - Opponent DRB%)
+    // Since higher DRB% is good, but in our data, we have DRB% (not DRB% allowed), so let's use:
+    // Edge = (Team ORB% - Opponent ORB%) + (Team DRB% - Opponent DRB%)
+    // But to match the original structure, let's use:
+    // Team edge = (Team ORB% - Opponent DRB%) - (Opponent ORB% - Team DRB%)
     return {
         a: (teamA.orb - teamB.drb) - (teamB.orb - teamA.drb),
         b: (teamB.orb - teamA.drb) - (teamA.orb - teamB.drb)
     };
 }
 function calcFreeThrowEdge(teamA, teamB) {
-    // team advantage = (team FTr - opponent FTrD) - (opponent FTr - team FTrD)
+    // Team edge = (Team FTr - Opponent FTr allowed) - (Opponent FTr - Team FTr allowed)
+    // Higher is better: high FTr and low FTr allowed.
     return {
-        a: (teamA.ftr - teamB.ftrd) - (teamB.ftr - teamA.ftrd),
-        b: (teamB.ftr - teamA.ftrd) - (teamA.ftr - teamB.ftrd)
+        a: (teamA.ftr - teamA.ftrd) - (teamB.ftr - teamB.ftrd),
+        b: (teamB.ftr - teamB.ftrd) - (teamA.ftr - teamA.ftrd)
     };
 }
 function calcTotalEdge(edges) {
